@@ -142,7 +142,7 @@ export async function generateInfographic(
   console.log('Generating infographic with prompt:', prompt.substring(0, 200) + '...');
 
   const response = await genai.models.generateContent({
-    model: 'gemini-2.0-flash-exp-image-generation',
+    model: 'gemini-3-pro-image-preview',
     contents: prompt,
     config: {
       responseModalities: ['Text', 'Image'] as const,
