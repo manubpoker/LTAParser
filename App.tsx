@@ -3,7 +3,8 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { Tournament, LogEntry, AppTab } from './types';
 import {
   FileText, Table, Globe, Info, Terminal, RefreshCw, Trash2,
-  Mail, MapPin, ExternalLink, Filter, Users, Shield, Zap, GraduationCap
+  Mail, MapPin, ExternalLink, Filter, Users, Shield, Zap, GraduationCap,
+  ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { fetchTournaments, uploadPdf, deleteAllTournaments } from './services/apiService';
 import Logger from './components/Logger';
@@ -23,6 +24,12 @@ const App: React.FC = () => {
   const [selectedGrade, setSelectedGrade] = useState<string>('All');
   const [selectedType, setSelectedType] = useState<string>('All');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+
+  // Sorting States
+  type SortColumn = 'ltaCode' | 'title' | 'category' | 'gender' | 'eventType' | 'date' | 'grade' | 'venue';
+  type SortDirection = 'asc' | 'desc';
+  const [sortColumn, setSortColumn] = useState<SortColumn>('date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
     setLogs(prev => [...prev, { timestamp: new Date().toISOString(), message, type }]);
@@ -105,9 +112,62 @@ const App: React.FC = () => {
   const eventTypes = useMemo(() => ['All', ...Array.from(new Set(tournaments.map(t => t.eventType)))], [tournaments]);
   const categories = useMemo(() => ['All', ...Array.from(new Set(tournaments.map(t => t.category)))].sort(), [tournaments]);
 
-  // Ensure filteredTournaments updates whenever any state changes
+  // Parse date string like "Sat 06 Sep" to sortable value
+  const parseDateForSort = useCallback((dateStr: string, month: string): number => {
+    const monthMap: Record<string, number> = {
+      'JAN': 0, 'FEB': 1, 'MAR': 2, 'APR': 3, 'MAY': 4, 'JUN': 5,
+      'JUL': 6, 'AUG': 7, 'SEP': 8, 'OCT': 9, 'NOV': 10, 'DEC': 11
+    };
+    const parts = dateStr.split(' ');
+    const day = parseInt(parts[1]) || 1;
+    const monthAbbr = parts[2]?.toUpperCase() || '';
+    const monthNum = monthMap[monthAbbr] ?? 0;
+    const yearMatch = month.match(/\d{4}/);
+    const year = yearMatch ? parseInt(yearMatch[0]) : 2025;
+    return new Date(year, monthNum, day).getTime();
+  }, []);
+
+  // Handle column sort click
+  const handleSort = useCallback((column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  }, [sortColumn]);
+
+  // Sort function for tournaments
+  const sortTournaments = useCallback((items: Tournament[]): Tournament[] => {
+    return [...items].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortColumn) {
+        case 'date':
+          comparison = parseDateForSort(a.date, a.month) - parseDateForSort(b.date, b.month);
+          break;
+        case 'grade':
+          const gradeA = parseInt(a.grade.replace(/[^0-9]/g, '')) || 0;
+          const gradeB = parseInt(b.grade.replace(/[^0-9]/g, '')) || 0;
+          comparison = gradeA - gradeB;
+          break;
+        case 'ltaCode':
+        case 'title':
+        case 'category':
+        case 'gender':
+        case 'eventType':
+        case 'venue':
+          comparison = (a[sortColumn] || '').localeCompare(b[sortColumn] || '');
+          break;
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [sortColumn, sortDirection, parseDateForSort]);
+
+  // Ensure filteredTournaments updates whenever any state changes, then apply sorting
   const filteredTournaments = useMemo(() => {
-    return tournaments.filter(t => {
+    const filtered = tournaments.filter(t => {
       const matchMonth = selectedMonth === 'All' || t.month === selectedMonth;
       const matchGender = selectedGender === 'All' || t.gender === selectedGender;
       const matchGrade = selectedGrade === 'All' || t.grade === selectedGrade;
@@ -115,7 +175,8 @@ const App: React.FC = () => {
       const matchCategory = selectedCategory === 'All' || t.category === selectedCategory;
       return matchMonth && matchGender && matchGrade && matchType && matchCategory;
     });
-  }, [tournaments, selectedMonth, selectedGender, selectedGrade, selectedType, selectedCategory]);
+    return sortTournaments(filtered);
+  }, [tournaments, selectedMonth, selectedGender, selectedGrade, selectedType, selectedCategory, sortTournaments]);
 
   // Helper to strip UK postcodes from venue text
   const stripPostcode = (text: string): string => {
@@ -147,12 +208,12 @@ const App: React.FC = () => {
   };
 
   const stAnnsTournaments = useMemo(() => {
-    const isStAnns = (v: string) => 
-      v.toLowerCase().includes("st ann") || 
+    const isStAnns = (v: string) =>
+      v.toLowerCase().includes("st ann") ||
       v.toLowerCase().includes("stann");
-      
+
     const base = tournaments.filter(t => isStAnns(t.venue));
-    return base.filter(t => {
+    const filtered = base.filter(t => {
       const matchMonth = selectedMonth === 'All' || t.month === selectedMonth;
       const matchGender = selectedGender === 'All' || t.gender === selectedGender;
       const matchGrade = selectedGrade === 'All' || t.grade === selectedGrade;
@@ -160,7 +221,8 @@ const App: React.FC = () => {
       const matchCategory = selectedCategory === 'All' || t.category === selectedCategory;
       return matchMonth && matchGender && matchGrade && matchType && matchCategory;
     });
-  }, [tournaments, selectedMonth, selectedGender, selectedGrade, selectedType, selectedCategory]);
+    return sortTournaments(filtered);
+  }, [tournaments, selectedMonth, selectedGender, selectedGrade, selectedType, selectedCategory, sortTournaments]);
 
   // Helper to generate Google Maps link from venue name
   const getGoogleMapsLink = (venue: string) => {
@@ -298,14 +360,14 @@ const App: React.FC = () => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
-                    <th className="px-4 py-4">Code</th>
-                    <th className="px-4 py-4">Name</th>
-                    <th className="px-4 py-4">Age Group</th>
-                    <th className="px-4 py-4">Gender</th>
-                    <th className="px-4 py-4 text-center">Type</th>
-                    <th className="px-4 py-4">Date</th>
-                    <th className="px-4 py-4 text-center">Grade</th>
-                    <th className="px-4 py-4">Venue</th>
+                    <SortableHeader label="Code" column="ltaCode" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                    <SortableHeader label="Name" column="title" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                    <SortableHeader label="Age Group" column="category" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                    <SortableHeader label="Gender" column="gender" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                    <SortableHeader label="Type" column="eventType" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} center />
+                    <SortableHeader label="Date" column="date" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                    <SortableHeader label="Grade" column="grade" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} center />
+                    <SortableHeader label="Venue" column="venue" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
                     <th className="px-4 py-4 text-center">Links</th>
                   </tr>
                 </thead>
@@ -384,14 +446,14 @@ const App: React.FC = () => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
-                    <th className="px-4 py-4">Code</th>
-                    <th className="px-4 py-4">Name</th>
-                    <th className="px-4 py-4">Age Group</th>
-                    <th className="px-4 py-4">Gender</th>
-                    <th className="px-4 py-4 text-center">Type</th>
-                    <th className="px-4 py-4">Date</th>
-                    <th className="px-4 py-4 text-center">Grade</th>
-                    <th className="px-4 py-4">Venue</th>
+                    <SortableHeader label="Code" column="ltaCode" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                    <SortableHeader label="Name" column="title" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                    <SortableHeader label="Age Group" column="category" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                    <SortableHeader label="Gender" column="gender" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                    <SortableHeader label="Type" column="eventType" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} center />
+                    <SortableHeader label="Date" column="date" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                    <SortableHeader label="Grade" column="grade" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} center />
+                    <SortableHeader label="Venue" column="venue" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
                     <th className="px-4 py-4 text-center">Links</th>
                   </tr>
                 </thead>
@@ -480,8 +542,8 @@ const FilterSelect: React.FC<{ label: string; icon: React.ReactNode; value: stri
     <div className="p-2 bg-slate-50 text-slate-400 rounded-lg">{icon}</div>
     <div className="flex-1 min-w-0">
       <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mb-0.5 truncate">{label}</div>
-      <select 
-        value={value} 
+      <select
+        value={value}
         onChange={(e) => onChange(e.target.value)}
         className="w-full bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer focus:text-emerald-700 truncate"
       >
@@ -489,6 +551,33 @@ const FilterSelect: React.FC<{ label: string; icon: React.ReactNode; value: stri
       </select>
     </div>
   </div>
+);
+
+const SortableHeader: React.FC<{
+  label: string;
+  column: string;
+  sortColumn: string;
+  sortDirection: 'asc' | 'desc';
+  onSort: (column: any) => void;
+  center?: boolean;
+}> = ({ label, column, sortColumn, sortDirection, onSort, center }) => (
+  <th
+    className={`px-4 py-4 cursor-pointer hover:bg-slate-100 transition-colors select-none ${center ? 'text-center' : ''}`}
+    onClick={() => onSort(column)}
+  >
+    <div className={`flex items-center gap-1.5 ${center ? 'justify-center' : ''}`}>
+      <span>{label}</span>
+      {sortColumn === column ? (
+        sortDirection === 'asc' ? (
+          <ArrowUp size={12} className="text-emerald-600" />
+        ) : (
+          <ArrowDown size={12} className="text-emerald-600" />
+        )
+      ) : (
+        <ArrowUpDown size={12} className="opacity-30" />
+      )}
+    </div>
+  </th>
 );
 
 export default App;
