@@ -52,6 +52,22 @@ app.use(cors({
 
 app.use(express.json());
 
+// Root endpoint - helpful message
+app.get('/', (req, res) => {
+  res.json({
+    name: 'LTA Parser API',
+    status: 'running',
+    tournamentCount: getTournamentCount(),
+    endpoints: {
+      'GET /api/tournaments': 'Get all tournaments',
+      'POST /api/tournaments/upload': 'Upload PDF to parse tournaments',
+      'DELETE /api/tournaments/:id': 'Delete a tournament',
+      'DELETE /api/tournaments': 'Delete all tournaments'
+    },
+    note: 'This is the API server. The frontend runs on a separate port (default: 3000)'
+  });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', tournamentCount: getTournamentCount() });
