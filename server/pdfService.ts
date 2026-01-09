@@ -1,5 +1,8 @@
-// Use legacy build for Node.js 18 compatibility
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { createRequire } from 'module';
+
+// Use createRequire to load pdfjs-dist (avoids ESM path issues on Windows)
+const require = createRequire(import.meta.url);
+const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
 
 export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   const data = new Uint8Array(buffer);
