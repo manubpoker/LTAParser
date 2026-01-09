@@ -94,8 +94,8 @@ export function parseTournamentsProgrammatically(text: string): Tournament[] {
     );
     let title = chunk.substring(rawCode.length, titleStopIndex).trim();
     title = title.replace(/^[-–—\s]+/, '').replace(/[-–—\s]+$/, '');
-    // Remove trailing date patterns like "- 1-11-2025", "- 01/11/2025", "- 1/11/25"
-    title = title.replace(/\s*[-–—]\s*\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}\s*$/gi, '');
+    // Remove trailing date patterns like "- 1-11-2025", "- 01/11/2025", "- 1/11/25", "- 2 - 1 - 2026"
+    title = title.replace(/\s*[-–—]\s*\d{1,2}\s*[-\/–—]\s*\d{1,2}\s*[-\/–—]\s*\d{2,4}\s*$/gi, '');
     // Clean up any trailing dashes/spaces
     title = title.replace(/[-–—\s]+$/, '').trim();
 
@@ -121,8 +121,11 @@ export function parseTournamentsProgrammatically(text: string): Tournament[] {
     const fullMonth = monthMap[monthAbbr] || 'Upcoming';
     const year = normalizedCode.includes('-25-') ? '2025' : '2026';
 
+    // Create unique ID combining code, gender, event type, and category
+    const uniqueId = `${normalizedCode}-${gender}-${eventType}-${currentCategory}`.replace(/\s+/g, '_');
+
     tournaments.push({
-      id: normalizedCode,
+      id: uniqueId,
       title: title || `${currentCategory} Event`,
       gender: gender,
       eventType: eventType,
