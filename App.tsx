@@ -178,6 +178,15 @@ const App: React.FC = () => {
     }
   };
 
+  // Format month like "Sept 25" from "September 2025"
+  const formatMonthShort = (month: string): string => {
+    const parts = month.split(' ');
+    if (parts.length !== 2) return month;
+    const monthName = parts[0].substring(0, 3);
+    const year = parts[1].substring(2); // "2025" -> "25"
+    return `${monthName} ${year}`;
+  };
+
   const months = useMemo(() => {
     const m = Array.from(new Set(tournaments.map(t => t.month)));
     return ['All', ...m.sort((a: any, b: any) => new Date(a).getTime() - new Date(b).getTime())];
@@ -186,7 +195,13 @@ const App: React.FC = () => {
   const genders = useMemo(() => ['All', ...Array.from(new Set(tournaments.map(t => t.gender)))], [tournaments]);
   const grades = useMemo(() => ['All', ...Array.from(new Set(tournaments.map(t => t.grade)))].sort(), [tournaments]);
   const eventTypes = useMemo(() => ['All', ...Array.from(new Set(tournaments.map(t => t.eventType)))], [tournaments]);
-  const categories = useMemo(() => ['All', ...Array.from(new Set(tournaments.map(t => t.category)))].sort(), [tournaments]);
+
+  // Special age group filters + actual categories
+  const categories = useMemo(() => {
+    const actual = Array.from(new Set(tournaments.map(t => t.category))).sort();
+    // Add special grouped filters at top
+    return ['All', 'Adult', 'Juniors', 'Red/Orange Ball', ...actual];
+  }, [tournaments]);
 
   // Parse date string like "Sat 06 Sep" to sortable value
   const parseDateForSort = useCallback((dateStr: string, month: string): number => {
@@ -241,6 +256,25 @@ const App: React.FC = () => {
     });
   }, [sortColumn, sortDirection, parseDateForSort]);
 
+  // Helper to check if category matches special filters
+  const matchesCategoryFilter = useCallback((category: string, filter: string): boolean => {
+    if (filter === 'All') return true;
+    if (filter === 'Adult') {
+      // Adult = Open or anything without "U" (Under age)
+      return category.toLowerCase().includes('open') || !category.match(/\d+U/i);
+    }
+    if (filter === 'Juniors') {
+      // Juniors = has "U" (Under) but NOT Red/Orange Ball (8U, 9U, 10U)
+      return category.match(/\d+U/i) !== null && !['8U', '9U', '10U'].some(age => category.includes(age));
+    }
+    if (filter === 'Red/Orange Ball') {
+      // Red/Orange Ball = 8U, 9U, 10U categories
+      return ['8U', '9U', '10U'].some(age => category.includes(age));
+    }
+    // Direct match for actual categories
+    return category === filter;
+  }, []);
+
   // Ensure filteredTournaments updates whenever any state changes, then apply sorting
   const filteredTournaments = useMemo(() => {
     const filtered = tournaments.filter(t => {
@@ -248,11 +282,11 @@ const App: React.FC = () => {
       const matchGender = selectedGender === 'All' || t.gender === selectedGender;
       const matchGrade = selectedGrade === 'All' || t.grade === selectedGrade;
       const matchType = selectedType === 'All' || t.eventType === selectedType;
-      const matchCategory = selectedCategory === 'All' || t.category === selectedCategory;
+      const matchCategory = matchesCategoryFilter(t.category, selectedCategory);
       return matchMonth && matchGender && matchGrade && matchType && matchCategory;
     });
     return sortTournaments(filtered);
-  }, [tournaments, selectedMonth, selectedGender, selectedGrade, selectedType, selectedCategory, sortTournaments]);
+  }, [tournaments, selectedMonth, selectedGender, selectedGrade, selectedType, selectedCategory, sortTournaments, matchesCategoryFilter]);
 
   // Helper to strip UK postcodes from venue text
   const stripPostcode = (text: string): string => {
@@ -294,11 +328,11 @@ const App: React.FC = () => {
       const matchGender = selectedGender === 'All' || t.gender === selectedGender;
       const matchGrade = selectedGrade === 'All' || t.grade === selectedGrade;
       const matchType = selectedType === 'All' || t.eventType === selectedType;
-      const matchCategory = selectedCategory === 'All' || t.category === selectedCategory;
+      const matchCategory = matchesCategoryFilter(t.category, selectedCategory);
       return matchMonth && matchGender && matchGrade && matchType && matchCategory;
     });
     return sortTournaments(filtered);
-  }, [tournaments, selectedMonth, selectedGender, selectedGrade, selectedType, selectedCategory, sortTournaments]);
+  }, [tournaments, selectedMonth, selectedGender, selectedGrade, selectedType, selectedCategory, sortTournaments, matchesCategoryFilter]);
 
   // Helper to generate Google Maps link from venue name
   const getGoogleMapsLink = (venue: string) => {
@@ -411,7 +445,7 @@ const App: React.FC = () => {
               <div className="flex flex-wrap justify-center gap-1 p-1 bg-slate-50 rounded-xl">
                 {months.map(m => (
                   <button key={m} onClick={() => setSelectedMonth(m)} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${selectedMonth === m ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-white'}`}>
-                    {m.split(' ')[0]}
+                    {m === 'All' ? 'All' : formatMonthShort(m)}
                   </button>
                 ))}
               </div>
