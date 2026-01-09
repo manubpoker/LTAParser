@@ -1,0 +1,7 @@
+{
+  "name": "StAnn's LTA Tournament Assistant",
+  "description": "A specialized tool for StAnn's Tennis to process LTA tournament PDFs, visualize event locations on a map, and generate a WordPress-style summary for the club website.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
