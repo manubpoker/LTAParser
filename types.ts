@@ -25,6 +25,5 @@ export interface LogEntry {
 export enum AppTab {
   WELCOME = 'welcome',
   TOURNAMENTS = 'tournaments',
-  MAP = 'map',
   VISUALIZATION = 'visualization'
 }

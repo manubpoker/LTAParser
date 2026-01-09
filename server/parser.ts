@@ -1,5 +1,4 @@
-
-import { Tournament } from "../types";
+import { Tournament } from './db.js';
 
 /**
  * Resilient parser for LTA Tournament Calendars.
@@ -8,13 +7,13 @@ import { Tournament } from "../types";
  */
 export function parseTournamentsProgrammatically(text: string): Tournament[] {
   const tournaments: Tournament[] = [];
-  
+
   // Normalize spacing and dashes
   const normalizedText = text.replace(/[–—]/g, '-');
-  
+
   // Permissive Regex for LTA Code
   const entryStartRegex = /([A-Z]\s*[A-Z]\s*[A-Z]\s*[-]\s*\d\s*\d\s*[-]\s*\d\s*\d\s*\d\s*\d)/g;
-  
+
   // Order matters - more specific patterns first (with gender suffixes)
   const categoryPatterns = [
     // 8U-10U are mixed gender (no Boys/Girls suffix)
