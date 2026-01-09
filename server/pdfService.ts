@@ -1,8 +1,5 @@
-import * as pdfjsLib from 'pdfjs-dist';
-
-// Set worker source for Node.js environment
-// @ts-ignore
-pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+// Use legacy build for Node.js 18 compatibility
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   const data = new Uint8Array(buffer);
