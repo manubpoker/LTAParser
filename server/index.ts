@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
+import path from 'path';
 import {
   getAllTournaments,
   insertTournaments,
@@ -11,6 +12,13 @@ import {
 } from './db.js';
 import { extractTextFromPdf } from './pdfService.js';
 import { parseTournamentsProgrammatically } from './parser.js';
+import {
+  generateInfographic,
+  getAllInfographics,
+  getInfographicPath,
+  deleteInfographic,
+  InfographicMetadata
+} from './infographicService.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -150,6 +158,77 @@ app.delete('/api/tournaments', (req, res) => {
     res.json({ success: true, message: `Deleted ${count} tournaments` });
   } catch (error: any) {
     console.error('Error deleting tournaments:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============ INFOGRAPHIC ENDPOINTS ============
+
+// Get all infographics metadata
+app.get('/api/infographics', (req, res) => {
+  try {
+    const infographics = getAllInfographics();
+    res.json({ success: true, count: infographics.length, infographics });
+  } catch (error: any) {
+    console.error('Error fetching infographics:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Serve infographic image by filename
+app.get('/api/infographics/image/:filename', (req, res) => {
+  try {
+    const { filename } = req.params;
+    const filepath = getInfographicPath(filename);
+
+    if (!filepath) {
+      return res.status(404).json({ success: false, error: 'Image not found' });
+    }
+
+    res.sendFile(path.resolve(filepath));
+  } catch (error: any) {
+    console.error('Error serving infographic:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Generate new infographic
+app.post('/api/infographics', async (req, res) => {
+  try {
+    const { tournaments, filters } = req.body;
+
+    if (!tournaments || !Array.isArray(tournaments) || tournaments.length === 0) {
+      return res.status(400).json({ success: false, error: 'No tournaments provided' });
+    }
+
+    console.log(`Generating infographic for ${tournaments.length} tournaments with filters:`, filters);
+
+    const metadata = await generateInfographic(tournaments, filters || {});
+
+    res.json({
+      success: true,
+      infographic: metadata,
+      imageUrl: `/api/infographics/image/${metadata.filename}`
+    });
+  } catch (error: any) {
+    console.error('Error generating infographic:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Delete an infographic
+app.delete('/api/infographics/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = deleteInfographic(id);
+
+    if (deleted) {
+      res.json({ success: true, message: `Infographic ${id} deleted` });
+    } else {
+      res.status(404).json({ success: false, error: 'Infographic not found' });
+    }
+  } catch (error: any) {
+    console.error('Error deleting infographic:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

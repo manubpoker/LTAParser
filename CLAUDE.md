@@ -4,6 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
+### Frontend (React/Vite)
 ```bash
 npm install      # Install dependencies
 npm run dev      # Start dev server on port 3000
@@ -11,35 +12,82 @@ npm run build    # Production build
 npm run preview  # Preview production build
 ```
 
+### Backend (Express/SQLite)
+```bash
+cd server
+npm install      # Install dependencies
+npm run dev      # Start API server on port 3001 (with hot reload via tsx)
+npm run build    # Compile TypeScript to dist/
+npm start        # Run production build
+```
+
+### Full-Stack Development
+Run both servers simultaneously in separate terminals:
+- Frontend: `npm run dev` (port 3000)
+- Backend: `cd server && npm run dev` (port 3001)
+
 ## Environment Setup
 
-Set `GEMINI_API_KEY` in `.env.local` for the Gemini AI service (optional - app uses programmatic parser by default).
+**Frontend** (`.env.local`):
+- `GEMINI_API_KEY` - Optional, for AI-based parser (not used by default)
+- `VITE_API_URL` - Backend API URL (defaults to `http://localhost:3001`)
+
+**Backend** (`server/`):
+- `PORT` - Server port (defaults to 3001)
+- `DATA_DIR` - SQLite database directory (defaults to `./data`)
+- `FRONTEND_URL` - For CORS configuration
 
 ## Architecture
 
-This is a React/TypeScript app built with Vite that parses LTA (Lawn Tennis Association) tournament PDF calendars for Sussex tennis clubs.
+Full-stack app for parsing LTA (Lawn Tennis Association) tournament PDF calendars for Sussex tennis clubs.
+
+### Frontend (React/TypeScript/Vite)
+- **App.tsx** - Main component with tab navigation, filters, sortable tables
+- **services/apiService.ts** - API client for backend communication
+- **services/parserService.ts** - Client-side regex parser (backup/testing)
+- **services/pdfService.ts** - pdf.js wrapper for text extraction
+- **types.ts** - Tournament interface and type definitions
+
+### Backend (Express/SQLite)
+- **server/index.ts** - Express API server with routes
+- **server/db.ts** - SQLite database with better-sqlite3, prepared statements
+- **server/parser.ts** - Server-side tournament parser (filters for SUS-* codes)
+- **server/pdfService.ts** - Server-side PDF text extraction
 
 ### Data Flow
+1. User uploads PDF via frontend
+2. Frontend sends PDF to `POST /api/tournaments/upload`
+3. Backend extracts text, parses tournaments, stores in SQLite
+4. Duplicates auto-skipped (uses composite unique ID: code-gender-eventType-category)
+5. Frontend fetches and displays from `GET /api/tournaments`
 
-1. **PDF Upload** (`App.tsx`) - User uploads LTA tournament calendar PDF
-2. **Text Extraction** (`services/pdfService.ts`) - Uses pdf.js (loaded via CDN in index.html) to extract text
-3. **Parsing** (`services/parserService.ts`) - Programmatic regex-based parser extracts Sussex tournaments (codes starting with "SUS-")
-4. **Display** - Four tabs: Upload, All Events table, Sussex Map, Club Export (St Ann's filtered view)
+### API Endpoints
+- `GET /api/tournaments` - List all tournaments
+- `POST /api/tournaments/upload` - Upload PDF (multipart/form-data)
+- `DELETE /api/tournaments/:id` - Delete single tournament
+- `DELETE /api/tournaments` - Delete all tournaments
+- `GET /health` - Health check with tournament count
 
-### Key Services
+## Deployment
 
-- **parserService.ts**: Core parser using regex patterns to extract tournament details (code, gender, grade, date, venue, deadlines) from multi-column PDF text. Filters for Sussex (SUS-*) tournaments only.
-- **geminiService.ts**: Alternative AI-based parser using Google Gemini (not used by default)
-- **pdfService.ts**: Wrapper around pdf.js for text extraction
+**Backend**: Fly.io (`server/fly.toml`)
+- App: `ltaparser`
+- URL: `https://ltaparser.fly.dev`
+- Uses persistent volume `lta_data` for SQLite
 
-### Types
+```bash
+cd server
+fly deploy --ha=false
+```
 
-`Tournament` interface in `types.ts` defines: id, title, gender, eventType, grade, venue, postcode, ltaCode, date, month, category, organiserEmail, deadlineCD, deadlineWD.
+**Frontend**: Vercel
+- Set `VITE_API_URL=https://ltaparser.fly.dev` in Vercel environment variables
+- Redeploy after changing env vars
 
-### Constants
+## Parser Logic
 
-`constants.ts` contains club name ("St Ann's Wells Tennis Club") and mock venue coordinates for the map view.
-
-### UI Pattern
-
-Single-page app with tab navigation. Filters (month, gender, grade, event type, age group) apply across all views. Uses Tailwind CSS classes and lucide-react icons.
+The parser (`server/parser.ts`) extracts Sussex tournaments using:
+- LTA codes matching `SUS-XX-XXXX` pattern
+- Category headers (8U-18U Boys/Girls, Open Men/Women)
+- Regex extraction for: gender, event type, grade, date, venue, deadlines, email
+- Composite unique IDs prevent duplicates with same code but different gender/event type

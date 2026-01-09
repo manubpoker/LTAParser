@@ -83,3 +83,71 @@ export async function checkHealth(): Promise<{ status: string; tournamentCount: 
   const response = await fetch(`${API_BASE}/health`);
   return response.json();
 }
+
+// ============ INFOGRAPHIC API ============
+
+export interface InfographicMetadata {
+  id: string;
+  filename: string;
+  prompt: string;
+  filters: {
+    month?: string;
+    gender?: string;
+    grade?: string;
+    eventType?: string;
+    ageGroup?: string;
+  };
+  tournamentCount: number;
+  createdAt: string;
+}
+
+export async function fetchInfographics(): Promise<InfographicMetadata[]> {
+  const response = await fetch(`${API_BASE}/api/infographics`);
+  const data = await response.json();
+
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to fetch infographics');
+  }
+
+  return data.infographics || [];
+}
+
+export async function generateInfographic(
+  tournaments: Tournament[],
+  filters: InfographicMetadata['filters']
+): Promise<{ infographic: InfographicMetadata; imageUrl: string }> {
+  const response = await fetch(`${API_BASE}/api/infographics`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ tournaments, filters }),
+  });
+
+  const data = await response.json();
+
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to generate infographic');
+  }
+
+  return {
+    infographic: data.infographic,
+    imageUrl: `${API_BASE}${data.imageUrl}`,
+  };
+}
+
+export async function deleteInfographic(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/api/infographics/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+
+  const data = await response.json();
+
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to delete infographic');
+  }
+}
+
+export function getInfographicImageUrl(filename: string): string {
+  return `${API_BASE}/api/infographics/image/${filename}`;
+}
