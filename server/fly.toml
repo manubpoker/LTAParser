@@ -1,7 +1,7 @@
 # fly.toml - Fly.io deployment configuration
 # See https://fly.io/docs/reference/configuration/
 
-app = "lta-parser-api"
+app = "ltaparser"
 primary_region = "lhr"
 
 [build]
