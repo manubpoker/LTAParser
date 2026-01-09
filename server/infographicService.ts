@@ -73,56 +73,47 @@ export function deleteInfographic(id: string): boolean {
 }
 
 function buildPrompt(tournaments: Tournament[], filters: InfographicMetadata['filters']): string {
-  // Determine visual theme based on filters
-  let visualTheme = 'professional tennis tournament';
-  let colorScheme = 'green and white tennis court colors';
-
-  if (filters.gender === 'Male') {
-    visualTheme = 'men\'s tennis competition';
-  } else if (filters.gender === 'Female') {
-    visualTheme = 'women\'s tennis competition';
-  }
-
-  if (filters.ageGroup) {
-    if (filters.ageGroup.includes('8U') || filters.ageGroup.includes('9U') || filters.ageGroup.includes('10U')) {
-      visualTheme = 'junior children\'s tennis, fun and energetic';
-      colorScheme = 'bright, playful colors with tennis elements';
-    } else if (filters.ageGroup.includes('U')) {
-      visualTheme = 'youth tennis competition';
-    } else if (filters.ageGroup.includes('Open')) {
-      visualTheme = 'adult tennis championship';
-    }
-  }
-
-  // Build tournament list text
+  // Build tournament list with required fields: date, venue, category, grade, gender, email
   const tournamentList = tournaments.slice(0, 12).map(t =>
-    `- ${t.title} | ${t.date} | ${t.venue} | ${t.category}`
+    `- Date: ${t.date} | Venue: ${t.venue} | Category: ${t.category} | Grade: ${t.grade} | Gender: ${t.gender}${t.organiserEmail ? ` | Contact: ${t.organiserEmail}` : ''}`
   ).join('\n');
+
+  // Collect unique organiser emails for the contact section
+  const uniqueEmails = [...new Set(tournaments.map(t => t.organiserEmail).filter(Boolean))];
+  const contactEmails = uniqueEmails.slice(0, 3).join(', ');
 
   const prompt = `Create a professional tennis tournament flyer/infographic with the following specifications:
 
-VISUAL STYLE:
-- Theme: ${visualTheme}
-- Color scheme: ${colorScheme}
-- Include tennis imagery (rackets, balls, courts, players silhouettes)
-- Modern, clean design suitable for a sports organization
-- Sussex Tennis branding style
+VISUAL STYLE - OFFICIAL LTA BRANDING:
+- Use official LTA (Lawn Tennis Association) color scheme:
+  - Primary: LTA Purple (#5B2D8C)
+  - Secondary: LTA Green (#00A651)
+  - Accent: White (#FFFFFF)
+  - Background: Light grey or white with purple/green accents
+- Include official LTA logo styling (text "LTA" in purple)
+- Modern, professional design matching LTA brand guidelines
+- Tennis ball and racket imagery integrated tastefully
 
 CONTENT TO DISPLAY:
-Title: "Sussex Tennis Tournaments${filters.ageGroup ? ' - ' + filters.ageGroup : ''}${filters.gender && filters.gender !== 'Mixed' ? ' - ' + filters.gender : ''}"
+Title: "Sussex LTA Tennis Tournaments${filters.ageGroup ? ' - ' + filters.ageGroup : ''}${filters.gender && filters.gender !== 'Mixed' ? ' - ' + filters.gender : ''}"
 
-Tournament List (display these events clearly):
+Tournament Details (display each event with these fields):
 ${tournamentList}
+
+FOOTER SECTION (REQUIRED):
+- Online Registration: https://www.lta.org.uk/
+${contactEmails ? `- Organiser Contact: ${contactEmails}` : ''}
+- "Lawn Tennis Association - Sussex County"
 
 LAYOUT:
 - 4:3 aspect ratio (landscape)
 - 2K resolution (2560x1920 pixels)
-- Clear hierarchy with title at top
-- Tournament details in organized grid or list
-- Contact/registration info at bottom
-- LTA (Lawn Tennis Association) Sussex branding
+- Clear hierarchy with LTA-styled title at top
+- Tournament details in organized grid showing: Date, Venue, Category, Grade, Gender
+- Registration URL and contact info prominently at bottom
+- LTA Sussex branding throughout
 
-Make it look like an official tournament announcement that could be shared on social media or printed as a poster.`;
+Create an official-looking tournament announcement suitable for social media and print. Do NOT use placeholder text - all information provided above is real data.`;
 
   return prompt;
 }
